@@ -125,7 +125,7 @@ def log_likelihood(theta):
     
         # the final loglikelihood
         logprob = func1(baseline1)
-        results = np.array([m1, m2, p1, p2, sesinw1, secosw1, sesinw2, secosw2,Omega1,Omega2, -0.5*loggprob])
+        results = np.array([m1, m2, p1, p2, sesinw1, secosw1, sesinw2, secosw2,Omega1,Omega2, -0.5*logprob])
 
         tf = tempfile.NamedTemporaryFile()
         np.savetxt(tf.name, results, fmt='%.10f')                                                         #saves each point as a temporary file
@@ -209,49 +209,6 @@ if __name__ == '__main__':
                                                 
 
         pool.map(log_likelihood, theta_list)
-                
-
-    #counter = 0
-    #for i in range(10):
-    #    for m1 in m1_array:
-    #        for m2 in m2_array:
-    #            for w1 in w1_array:
-    #                for w2 in w2_array:
-    #                    for e1 in e1_array:
-    #                        for e2 in e2_array:
-    #                            for p1 in p1_array:
-    #                                for pratio in Pratio_array:
-    #                                    for Omega1 in Omega1_array:
-    #                                        for Omega2 in Omega2_array:
-    #                                            p2 = p1*pratio
-    #                                            sesinw1 = e1**0.5*np.sin(w1/180.*np.pi)
-    #                                            secosw1 = e1**0.5*np.cos(w1/180.*np.pi)
-    #                                            sesinw2 = e2**0.5*np.sin(w2/180.*np.pi)
-    #                                            secosw2 = e2**0.5*np.cos(w2/180.*np.pi)
-    #                                            theta = [m1, m2, p1, p2, sesinw1, secosw1, sesinw2, secosw2,Omega1,Omega2]
-    #                                            #theta_list.append(theta)
-    #                                            try:
-    #                                                logprob = log_likelihood(theta)
-    #                                                np.savetxt("/home/enabbie/koi134_fitresults/ttvparams_step", logprob, fmt='%.10f')
-    #                                                os.system("cat /home/enabbie/koi134_fitresults/ttvparams_step >> /home/enabbie/koi134_fitresults/rebound_tested_params")
-    #                                            except RuntimeError:
-    #                                                logprob= -np.inf
-    #                                            counter+=1
-    #                                        
-    #                                        counter+=1
-    #                                    counter+=1
-    #                                    
-    #                                    if counter>10:
-    #                                        break
-    #                                    break
-    #                                break
-    #                            break
-    #                        break
-    #                    break
-    #                break
-    #            break
-    #        break
-    #    break
 
 
 
