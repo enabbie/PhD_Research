@@ -8,6 +8,7 @@ import os
 import itertools
 from multiprocessing import Pool
 import time
+import tempfile
 
 os.environ['OMP_NUM_THREADS']="1"
 
@@ -131,7 +132,6 @@ def log_likelihood(theta):
         np.savetxt(tf.name, results, fmt='%.10f')                                                         #saves each point as a temporary file
 
         os.system(f"cat {tf.name} >> /home/enabbie/koi134_fitresults/rebound_tested_params")              #adds it to a master file
-        os.unlink(tf.name)                                                                                #deletes file
  
         return m1, m2, p1, p2, sesinw1, secosw1, sesinw2, secosw2,Omega1,Omega2,-0.5*logprob 
    
@@ -141,7 +141,6 @@ def log_likelihood(theta):
         np.savetxt(tf.name, results, fmt='%.10f')
 
         os.system(f"cat {tf.name} >> /home/enabbie/koi134_fitresults/rebound_tested_params")
-        os.unlink(tf.name)
 
         return m1, m2, p1, p2, sesinw1, secosw1, sesinw2, secosw2,Omega1,Omega2, -np.inf
 counter = 0
@@ -166,8 +165,8 @@ if __name__ == '__main__':
     resonance_arrays = [p12_arr,p23_arr,p34_arr,p13_arr,p43_arr,p32_arr,p21_arr,p31_arr]
 
     big_list = list(itertools.chain(p12_arr,p23_arr,p34_arr,p13_arr,p43_arr,p32_arr,p21_arr,p31_arr))
-    #Pratio_array = np.array(big_list)
-    Pratio_array = np.array([0.5,0.6])
+    Pratio_array = np.array(big_list)
+    #Pratio_array = np.array([0.5,0.6])
 
     #p2_array = np.linspace(34.55159-0.1, 34.55159+0.1, 20)
     
@@ -209,16 +208,3 @@ if __name__ == '__main__':
                                                 
 
         pool.map(log_likelihood, theta_list)
-
-
-
-    #time2 = time.time()
-    #elapsed_time=time2-time1
-        
-
-
-        #print(m1, m2, p1, p2, sesinw1, secosw1, sesinw2, secosw2, logprob)
-        
-        #master_pos = np.array(m1, m2, p1, p2, sesinw1, secosw1, sesinw2, secosw2, logprob)
-        #np.savetxt("/home/enabbie/koi134_fitresults/ttvparams_step", results, fmt='%.10f')
-        #os.system("cat /home/enabbie/koi134_fitresults/ttvparams_step >> /home/enabbie/koi134_fitresults/rebound_tested_params")
