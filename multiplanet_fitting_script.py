@@ -650,15 +650,15 @@ if __name__ == '__main__':
             max_n = 75000
 
             sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=(freeparams,fixed_params,system_list),pool=pool)
-            os.system("rm -rf /home/u8015661/emma/koi134_fitresults/toi5143/mcmc_tested_params_nottvs")
-            os.system("rm -rf /home/u8015661/emma/koi134_fitresults/toi5143/testparams_step_nottvs")
+            os.system("rm -rf /home/u8015661/emma/koi134_fitresults/toi5143/mcmc_tested_params")
+            os.system("rm -rf /home/u8015661/emma/koi134_fitresults/toi5143/testparams_step")
 
             header2 = freeparams.unpack()
             header2.append('likelihood')
             header = np.array(header2)
 
-            np.savetxt('/home/u8015661/emma/koi134_fitresults/toi5143/testparams_step_nottvs', header.reshape(1,header.shape[0]),fmt='%s')
-            os.system('cat /home/u8015661/emma/koi134_fitresults/toi5143/testparams_step >> /home/u8015661/emma/koi134_fitresults/toi5143/mcmc_tested_params_nottvs')
+            np.savetxt('/home/u8015661/emma/koi134_fitresults/toi5143/testparams_step', header.reshape(1,header.shape[0]),fmt='%s')
+            os.system('cat /home/u8015661/emma/koi134_fitresults/toi5143/testparams_step >> /home/u8015661/emma/koi134_fitresults/toi5143/mcmc_tested_params')
 
             master_pos = np.ones([100*nwalkers,ndim+1])
             counter = 0
@@ -675,6 +675,6 @@ if __name__ == '__main__':
                     counter += 1
                     
                     if counter >= 100 * nwalkers:
-                        np.savetxt("/home/u8015661/emma/koi134_fitresults/toi5143/testparams_step_nottvs", master_pos, fmt='%.10f')
-                        os.system("cat /home/u8015661/emma/koi134_fitresults/toi5143/testparams_step >> /home/u8015661/emma/koi134_fitresults/toi5143/mcmc_tested_params_nottvs")
+                        np.savetxt("/home/u8015661/emma/koi134_fitresults/toi5143/testparams_step", master_pos, fmt='%.10f')
+                        os.system("cat /home/u8015661/emma/koi134_fitresults/toi5143/testparams_step >> /home/u8015661/emma/koi134_fitresults/toi5143/mcmc_tested_params")
                         counter = 0
