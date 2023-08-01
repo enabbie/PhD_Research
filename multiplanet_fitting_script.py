@@ -11,17 +11,29 @@ from isochrones.mist.bc import MISTBolometricCorrectionGrid
 from isochrones import get_ichrone
 import time
 import scipy
+from scipy import optimize
+import radvel
+import radvel.likelihood
 from astroquery.mast import Catalogs
 import sys
+
  
 #turn off automatic parallelization to avoid problems with later parallelization method
 os.environ["OMP_NUM_THREADS"] = "1"
+
+################################################
+##### initializing paths to required files #####
+################################################
+
+filepath = '/home/u1153471/koi134_scripts/'
+out_folder = '/home/u8015661/emma/koi134_fitresults/toi5143/'
+#filepath = '/home/u8015661/emma/koi134_scripts/toi5143/'
+
 priorcsv = str(sys.argv[1])           #name of prior csv
 
  #loading in data from csv file
-
-data = pd.read_csv("/home/u8015661/emma/koi134_scripts/toi5143/toi5143_lc.csv",comment='#', header=0)
-ntransit_vs_center = pd.read_csv('/home/u8015661/emma/koi134_scripts/toi5143/transittimes_TOI5143.csv', comment='#',header=0)  #csv of approximate transit times and durations
+data = pd.read_csv(filepath+'toi5143_lc',comment='#', header=0) #reading in light curve file
+ntransit_vs_center = pd.read_csv(filepath+'transittimes_TOI5143.csv', comment='#',header=0)  #csv of approximate transit times and durations
 
 #obj_id = "TIC 271772050"
 obj_id = "TIC 281837575"
@@ -307,6 +319,60 @@ def sed_likelihood(params):
     #print(mstar, logg, rstar, feh, teff, av, par, np.log10(age), mist_rad, mist_teff,mist_logg,Jsed, Hsed, Ksed, Gsed, Bpsed, Rpsed, chi2_mist, chi2_sed, chi2_harps, prob)
     return -prob
 
+#### RadVel Fitting ####
+
+#read in rv data
+jd_ESPRESSO, rv_ESPRESSO, erv_ESPRESSO = np.loadtxt('WASP-47_ESPRESSO.vels', unpack=True, usecols=(0,1,2))
+
+def initialize_model(planet_dict):
+    #initial positions based on current theta; note e = 0 bc of usp
+    p = planet_dict['p'].value
+    t0 = planet_dict['t0'].value
+    w =  planet_dict['w'].value
+    k = planet_dict['k'].value   #guess here
+    jitter = planet_dict['jitter'].value
+    gamma = (rv_ESPRESSO.max()+rv_ESPRESSO.min())/2 #offset that you need to subtract off to compare models
+
+    nplanets = len(system_list)-1
+    planet_letters = {1:'b'}
+    #stellar = dict(mstar=system_list[0]['mstar'].value, mstar_err=system_list[0]['mstar'].err)
+
+    #Set a time base that's located in the middle of your RV time series
+    time_base = 0.5*(jd_ESPRESSO.min() + jd_ESPRESSO.max())
+
+    #Add starting values for the orbital parameters, taken either from the literature
+    #or from your transit fit -- these don't constrain the fit, they just give it somewhere
+    #to start from
+    anybasis_params = radvel.Parameters(nplanets,basis='per tc e w k', planet_letters=planet_letters)
+    anybasis_params['per1'] = radvel.Parameter(value=p)              #Orbital period
+    anybasis_params['tc1'] = radvel.Parameter(value=t0)              #Time of conjunction
+    anybasis_params['e1'] = radvel.Parameter(value=0.0)              #orbital eccentricity
+    anybasis_params['w1'] = radvel.Parameter(value=w)                #longitude of periastron -- this is rarely well constrained, so just start with pi/2
+    anybasis_params['k1'] = radvel.Parameter(value=k)                #RV semi-amplitude in m/s
+    anybasis_params['dvdt'] = radvel.Parameter(value=0.0)            #RV slope: (If rv is m/s and time is days then [dvdt] is m/s/day)
+    anybasis_params['curv'] = radvel.Parameter(value=0.0)            #RV curvature: (If rv is m/s and time is days then [curv] is m/s/day^2)
+
+    #Add an offset term for each of your data sets, these start as 0 and will 
+    #be fit to align the data sets with one another
+    anybasis_params['gamma_ESPRESSO'] = radvel.Parameter(value=gamma)      
+
+    anybasis_params['jit_ESPRESSO'] = radvel.Parameter(value=jitter)
+
+    # Convert input orbital parameters into the fitting basis
+    fitting_basis = 'per tc secosw sesinw k' #There are other options specified in the RadVel paper, but this one is pretty common
+    params = anybasis_params.basis.to_any_basis(anybasis_params,fitting_basis)
+
+    mod = radvel.RVModel(params, time_base=time_base)
+    
+    return mod
+
+def rv_likelihood(theta, rv_t, rv, rv_e):
+
+    rv_model = initialize_model(theta)
+    rv_model_points = rv_model(rv_t) - rv_model.params['gamma_ESPRESSO'].value
+    erv2 = rv_e**2 #rv errors here
+    return -0.5 * np.sum((rv - rv_model_points) ** 2 / erv2 + np.log(erv2))
+
 
 ###### Log Likelihood ######
 
@@ -388,12 +454,13 @@ def log_likelihood(theta, freeparams, fixedparams, system_list):
                 return -np.inf
 
     sed_likelihood_value = sed_likelihood(system_list[0])
+    rv_likelihood_value = rv_likelihood(system_list[0])
 
     #sigma2 = yerr**2
     #return -0.5 * np.sum((y - model) ** 2 / sigma2 + np.log(sigma2)) + sed_likelihood_value
         
         
-    return planet_likelihood_value + sed_likelihood_value
+    return planet_likelihood_value + sed_likelihood_value + rv_likelihood_value
 
 
 ####### Log Prior #######
@@ -588,7 +655,7 @@ def least_sq(theta_p, mask, residual, lc_err):
 ##########################################################
 if __name__ == '__main__':
 
-    system_list, freeparams, fixed_params, true_values = read_fit_param_csv("/home/u8015661/emma/koi134_scripts/"+priorcsv)  #koi134_prior_notdvs.csv
+    system_list, freeparams, fixed_params, true_values = read_fit_param_csv(filepath+priorcsv)  #koi134_prior_notdvs.csv
 
 
     ##########################################################
@@ -650,15 +717,15 @@ if __name__ == '__main__':
             max_n = 75000
 
             sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=(freeparams,fixed_params,system_list),pool=pool)
-            os.system("rm -rf /home/u8015661/emma/koi134_fitresults/toi5143/mcmc_tested_params_nottvs")
-            os.system("rm -rf /home/u8015661/emma/koi134_fitresults/toi5143/testparams_step_nottvs")
+            os.system("rm -rf "+out_folder+"mcmc_tested_params_nottvs")
+            os.system("rm -rf "+out_folder+ "testparams_step_nottvs")
 
             header2 = freeparams.unpack()
             header2.append('likelihood')
             header = np.array(header2)
 
-            np.savetxt('/home/u8015661/emma/koi134_fitresults/toi5143/testparams_step_nottvs', header.reshape(1,header.shape[0]),fmt='%s')
-            os.system('cat /home/u8015661/emma/koi134_fitresults/toi5143/testparams_step >> /home/u8015661/emma/koi134_fitresults/toi5143/mcmc_tested_params_nottvs')
+            np.savetxt(out_folder+'testparams_step_nottvs', header.reshape(1,header.shape[0]),fmt='%s')
+            os.system('cat '+out_folder+'testparams_step >> '+ out_folder+'mcmc_tested_params_nottvs')
 
             master_pos = np.ones([100*nwalkers,ndim+1])
             counter = 0
@@ -675,6 +742,6 @@ if __name__ == '__main__':
                     counter += 1
                     
                     if counter >= 100 * nwalkers:
-                        np.savetxt("/home/u8015661/emma/koi134_fitresults/toi5143/testparams_step_nottvs", master_pos, fmt='%.10f')
-                        os.system("cat /home/u8015661/emma/koi134_fitresults/toi5143/testparams_step >> /home/u8015661/emma/koi134_fitresults/toi5143/mcmc_tested_params_nottvs")
+                        np.savetxt(out_folder+"testparams_step_nottvs", master_pos, fmt='%.10f')
+                        os.system("cat "+ out_folder +"testparams_step >> " + out_folder + "mcmc_tested_params_nottvs")
                         counter = 0
