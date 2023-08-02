@@ -25,56 +25,55 @@ os.environ["OMP_NUM_THREADS"] = "1"
 ##### initializing paths to required files #####
 ################################################
 
-filepath = '/home/u1153471/koi134_scripts/'
-out_folder = '/home/u8015661/emma/koi134_fitresults/toi5143/'
+filepath = '/home/u1153471/toi3261_scripts/'
+out_folder = '/home/u8015661/emma/toi3261_fitresults/'
 #filepath = '/home/u8015661/emma/koi134_scripts/toi5143/'
 
 priorcsv = str(sys.argv[1])           #name of prior csv
 
  #loading in data from csv file
 data = pd.read_csv(filepath+'toi5143_lc',comment='#', header=0) #reading in light curve file
-ntransit_vs_center = pd.read_csv(filepath+'transittimes_TOI5143.csv', comment='#',header=0)  #csv of approximate transit times and durations
+#ntransit_vs_center = pd.read_csv(filepath+'transittimes_TOI5143.csv', comment='#',header=0)  #csv of approximate transit times and durations
 
-#obj_id = "TIC 271772050"
-obj_id = "TIC 281837575"
+obj_id = "TIC 358070912"
 
 t = np.array(data["time"])
 y = np.array(data["flux"])
 yerr = np.array(data["err"]) #error
 
-ntransit = np.array(ntransit_vs_center['epoch'])
-duration = np.array(ntransit_vs_center['duration'])
+#ntransit = np.array(ntransit_vs_center['epoch'])
+#duration = np.array(ntransit_vs_center['duration'])
 #kepler_time_arr = ntransit_vs_center['time']
 #tess_time_arr = kepler_time_arr + 2454833 - 2457000
-tess_time_arr = ntransit_vs_center['time']
-time_error = ntransit_vs_center['err']
+#tess_time_arr = ntransit_vs_center['time']
+#time_error = ntransit_vs_center['err']
 
-ntransit_vs_center['tess_time'] = tess_time_arr
-center = ntransit_vs_center['tess_time']
+#ntransit_vs_center['tess_time'] = tess_time_arr
+#center = ntransit_vs_center['tess_time']
 
-objectno = np.array(ntransit_vs_center['objectno'])
-namearr = np.array(['t0']*len(center))
-priorarr = np.array(['box']*len(center))
-flagarr = np.array(['free']*len(center))
-spread_arr = np.array([.0002]*len(center))
+#objectno = np.array(ntransit_vs_center['objectno'])
+#namearr = np.array(['t0']*len(center))
+#priorarr = np.array(['box']*len(center))
+#flagarr = np.array(['free']*len(center))
+#spread_arr = np.array([.0002]*len(center))
 
-t0_df = pd.DataFrame.from_dict({'name':namearr,'objectno':objectno,'epoch':ntransit,'value':center,'error':time_error*10,'lower_bound':(center-(time_error*10)),'upper_bound':(center+(time_error*10)),'prior': priorarr,'spread': spread_arr,'flag':flagarr})
+#t0_df = pd.DataFrame.from_dict({'name':namearr,'objectno':objectno,'epoch':ntransit,'value':center,'error':time_error*10,'lower_bound':(center-(time_error*10)),'upper_bound':(center+(time_error*10)),'prior': priorarr,'spread': spread_arr,'flag':flagarr})
 
-time_mask = []
+#time_mask = []
 
-for j in range(np.max(objectno)):
-    ntransit_j = np.array(t0_df[t0_df['objectno']==(j+1)]['epoch'])
-    center_j = np.array(t0_df[t0_df['objectno']==(j+1)]['value'])
-    duration_j = duration[t0_df['objectno']==(j+1)]
+#for j in range(np.max(objectno)):
+#    ntransit_j = np.array(t0_df[t0_df['objectno']==(j+1)]['epoch'])
+#    center_j = np.array(t0_df[t0_df['objectno']==(j+1)]['value'])
+#    duration_j = duration[t0_df['objectno']==(j+1)]
 
-    fit = np.polyfit(ntransit_j, center_j, 1)  #linear fit just to get prediction of p and t0 for masking purposes
-    period = fit[0]
-    t0_original = fit[1]
+#    fit = np.polyfit(ntransit_j, center_j, 1)  #linear fit just to get prediction of p and t0 for masking purposes
+#    period = fit[0]
+#    t0_original = fit[1]
 
-    for i in range(len(ntransit_j)):
-        t0_i = t0_original + period*ntransit_j[i]
-        time_mask_i = (t>(t0_i-6*duration_j[i])) & (t < (t0_i+6*duration_j[i]))  #creates time masks to cut out each individual transit
-        time_mask.append(time_mask_i)
+#    for i in range(len(ntransit_j)):
+#        t0_i = t0_original + period*ntransit_j[i]
+#        time_mask_i = (t>(t0_i-6*duration_j[i])) & (t < (t0_i+6*duration_j[i]))  #creates time masks to cut out each individual transit
+#        time_mask.append(time_mask_i)
         
 ####################################
 ######### Defining Classes #########
@@ -213,16 +212,13 @@ Hmagerr = photometry['e_Hmag'][0]
 Kmag = photometry['Kmag'][0]
 Kmagerr = photometry['e_Kmag'][0]
 
-#Gmag = photometry['GAIAmag'][0]
-Gmag = 13.619514
+Gmag = 13.046638
 Gmagerr = .03
 
-#BPmag = photometry['gaiabp'][0]
-BPmag = 13.92255
+BPmag = 13.509357
 BPmagerr = .03                       #use error floor of .03 for gaia bands
 
-#RPmag = photometry['gaiarp'][0]
-RPmag = 13.157321
+RPmag = 12.427166
 RPmagerr = .03
 
 W1mag = photometry['w1mag'][0]
@@ -273,7 +269,6 @@ def batman_model(input_dict, star_dict, time):
         params.limb_dark = "quadratic"                              #limb darkening model
         
         if np.min(np.abs(np.ediff1d(time))) > 0.0007:                        #supersample for long cadence data - if it's above 1 minute, then it's long cadence
-            #m = batman.TransitModel(params,time,supersample_factor=7,exp_time=.02041667) #for kepler
             m = batman.TransitModel(params,time,supersample_factor=7,exp_time=.001389) #for tess
         else:
             m = batman.TransitModel(params, time)                   #initializes model
@@ -386,81 +381,65 @@ def log_likelihood(theta, freeparams, fixedparams, system_list):
 
 
     #updating planet dictionaries by packing in new theta
-    for i in range(len(system_list)-1):                             #for each planet,
-        for tn in range(len(system_list[i+1])):                     #and each transit of that planet,
-            for m in range(len(theta)):                             #and each free parameter that we go through,
-                if freeparams.unpack()[m][:2] == 't0':              #if this is a transit time, we have to treat it differently
-           
-                    word = freeparams.unpack()[m]
-                    var_name = word.split('_')[0]                   #omits everything after '_' -> ex. t01_3 becomes t01
-                    transit_number = eval(word.split('_')[1])       #saves transit number as an integer (so we still know, for example, that t01_3 corresponds to transit 3)
-                    var_subscript = var_name[-1]                    #do this to get the object number
-                    
-                    if (int(var_subscript) == (i+1)) & (int(transit_number) == int(system_list[i+1][tn]['t0'].epoch)):    #must match object AND transit number          
-                        system_list[i+1][tn][var_name[:-1]].value = theta[m]                                #evaluate the variable and store it in its respective planet dictionary
-
-                else:                                                                                       #if it's not a transit time, just pack it as normal
-                    if freeparams[m].objno == 0:
-                        continue
-                    if int(freeparams.unpack()[m][-1]) == (i+1):                                            #if the subscript (ex. p1, p2) matches the current planet we're looking at
-                        system_list[i+1][tn][freeparams.unpack()[m][:-1]].value = theta[m]                  #evaluate variable and store it in its respective planet dictionary
+    for i in range(len(system_list)-1):                         #for each planet,
+        for m in range(len(theta)):                             #and each free parameter that we go through,                                                                                  #if it's not a transit time, just pack it as normal
+            if int(freeparams[m].objno) == 0:
+                continue
+            elif int(freeparams.unpack()[m][-1]) == (i+1):                               #if the subscript (ex. p1, p2) matches the current planet we're looking at
+                system_list[i+1][freeparams.unpack()[m][:-1]].value = theta[m]           #evaluate variable and store it in its respective planet dictionary
 
     for i in range(len(theta)):
-        if (freeparams[i].objno == 0) :  #if these are stellar parameters, update star dictionary
+        if (int(freeparams[i].objno) == 0) :  #if these are stellar parameters, update star dictionary
             system_list[0][freeparams[i].name].value = theta[i]
         else:
-            #system_list[int(freeparams[i].name[-1])][freeparams[i].name[:-1]].value = theta[i]  #if they're planet parameters, match them to correct planet
             pass
 
     
 
     #### fitting t0's using residual - perform operations for each transit separately  ####
     planet_likelihood_value = 0
-    mask_counter = 0
+    #mask_counter = 0
+    model = np.zeros(len(t))
 
     for i in range(len(system_list)-1):
-        ntransit_number = len(system_list[i+1])  #number of sub-dictionaries in the planet dictionary = # transits
+        #ntransit_number = len(system_list[i+1])  #number of sub-dictionaries in the planet dictionary = # transits
 
-        for m in range(ntransit_number):    #generate likelihood of each transit separately
-            #model = np.zeros(len(t))
-            #model_i = batman_model(system_list[i+1], system_list[0],t) - 1   #model for multiplanet system using superposition of individual planet models
-            #model += model_i
-            #model += 1
+        #for m in range(ntransit_number):    #generate likelihood of each transit separately
     
-            theta_p = [1,0.01,0.01,0.01] #initial guesses for polynomial coefficients [c0, c1, c2, c3]
+        #    theta_p = [1,0.01,0.01,0.01] #initial guesses for polynomial coefficients [c0, c1, c2, c3]
             
-            t_mask = time_mask[mask_counter]
-            restricted_flux = y[t_mask]
+        #    t_mask = time_mask[mask_counter]
+        #    restricted_flux = y[t_mask]
 
-            model = batman_model(system_list[i+1][m],system_list[0],t[t_mask])
+        #    model = batman_model(system_list[i+1][m],system_list[0],t[t_mask])
 
-            residual = restricted_flux - model
+        #    residual = restricted_flux - model
             
-            detrend_lsq = scipy.optimize.leastsq(least_sq, theta_p, args=(t_mask,residual,yerr[t_mask]))
+        #    detrend_lsq = scipy.optimize.leastsq(least_sq, theta_p, args=(t_mask,residual,yerr[t_mask]))
             
-            c0_new = detrend_lsq[0][0]
-            c1_new = detrend_lsq[0][1]
-            c2_new = detrend_lsq[0][2]
-            c3_new = detrend_lsq[0][3]
+        #    c0_new = detrend_lsq[0][0]
+        #    c1_new = detrend_lsq[0][1]
+        #    c2_new = detrend_lsq[0][2]
+        #    c3_new = detrend_lsq[0][3]
             
-            poly_model = polynomial(normalize(t[t_mask]),c0_new,c1_new,c2_new,c3_new)
-            
-            likelihood_i = np.sum((residual - poly_model)**2/yerr[t_mask]**2)
-            planet_likelihood_value += (-0.5*likelihood_i)
-            mask_counter+=1
+        #    poly_model = polynomial(normalize(t[t_mask]),c0_new,c1_new,c2_new,c3_new)
+        
+        model_i = batman_model(system_list[i+1],system_list[0],t) - 1
+        model += model_i    
+    model += 1
+    likelihood = np.sum((y - model)**2/yerr**2)
+    planet_likelihood_value += (-0.5*likelihood)
+        #    mask_counter+=1
     
             #if batman returns nans, have the log likelihood be -inf
-            if (np.isnan(model).all() == True) or (np.sum(np.abs(model-1))<len(model)*1e-5):
-                return -np.inf
+    if (np.isnan(model).all() == True) or (np.sum(np.abs(model-1))<len(model)*1e-5):
+        return -np.inf
 
     sed_likelihood_value = sed_likelihood(system_list[0])
-    rv_likelihood_value = rv_likelihood(system_list[0])
-
-    #sigma2 = yerr**2
-    #return -0.5 * np.sum((y - model) ** 2 / sigma2 + np.log(sigma2)) + sed_likelihood_value
+    #rv_likelihood_value = rv_likelihood(system_list[1])
         
         
-    return planet_likelihood_value + sed_likelihood_value + rv_likelihood_value
+    return planet_likelihood_value + sed_likelihood_value #+ rv_likelihood_value
 
 
 ####### Log Prior #######
@@ -482,10 +461,10 @@ def log_probability(theta, freeparams, fixedparams, system_list):
     if not np.isfinite(lp):
         return -np.inf
     probability = lp + log_likelihood(theta, freeparams, fixedparams, system_list)
-    debugline = ''
-    for i in range(len(theta)):
-        debugline+="%f," % theta[i]
-    debugline+="%f,%f" % (lp, probability)
+    #debugline = ''
+    #for i in range(len(theta)):
+    #    debugline+="%f," % theta[i]
+    #debugline+="%f,%f" % (lp, probability)
     
     return probability
 
@@ -519,12 +498,8 @@ def bin_data(x,data, bins, xmin, xmax):
 
 #### Converting to Variable ####
 def convert_to_variable(input_row):
-    if input_row['name'] == 't0':
-        var_prior = PriorFunction(input_row['prior'], center_value=input_row['value'], error = input_row['error'], upper_bound= input_row['upper_bound'], lower_bound=input_row['lower_bound'],spread=input_row['spread'])
-        var_dict  = TransitTime(input_row['name'],input_row['objectno'],input_row['value'],input_row['epoch'], input_row['error'], prior = var_prior, flag = input_row['flag'])
-    else:
-        var_prior = PriorFunction(input_row['prior'], center_value=input_row['value'], error = input_row['error'], upper_bound= input_row['upper_bound'], lower_bound=input_row['lower_bound'],spread=input_row['spread'])
-        var_dict  = Variable(input_row['name'],input_row['objectno'],input_row['value'],input_row['error'], prior = var_prior, flag = input_row['flag'])
+    var_prior = PriorFunction(input_row['prior'], center_value=input_row['value'], error = input_row['error'], upper_bound= input_row['upper_bound'], lower_bound=input_row['lower_bound'],spread=input_row['spread'])
+    var_dict  = Variable(input_row['name'],input_row['objectno'],input_row['value'],input_row['error'], prior = var_prior, flag = input_row['flag'])
 
     return var_dict
 
@@ -533,7 +508,7 @@ def read_fit_param_csv(input_csv):
     nplanet = exofop_data['objectno'].max()
 
     #### Adding transit times to prior dataframe ####
-    exofop_data = pd.concat([exofop_data,t0_df], ignore_index=True)
+    #exofop_data = pd.concat([exofop_data,t0_df], ignore_index=True)
 
     system_list = []
     
@@ -553,28 +528,28 @@ def read_fit_param_csv(input_csv):
             system_list.append(star_dict)
 
         else:
-            exofop_data_m = exofop_data[exofop_data['objectno'] == obj]   #all parameters for specific planet + its different transit times
+            exofop_data_i = exofop_data[exofop_data['objectno'] == obj]   #all parameters for specific planet + its different transit times
             
-            transit_times = np.array(exofop_data_m['epoch'][exofop_data_m['name']=='t0'])                   #list showing all of the epochs of data you have
-            ntransits = len(transit_times)
+            #transit_times = np.array(exofop_data_m['epoch'][exofop_data_m['name']=='t0'])                   #list showing all of the epochs of data you have
+            #ntransits = len(transit_times)
 
-            list_name = f'planet{obj}_list'                               #'master' planet list that will hold all dictionaries for different transits of the same planet (different t0's)
-            locals()[list_name] = []
+            #list_name = f'planet{obj}_list'                               #'master' planet list that will hold all dictionaries for different transits of the same planet (different t0's)
+            #locals()[list_name] = []
+            dict_name = f'planet{obj}_dict'
             
-            for i in range(ntransits):                                #iterate through each transit to create transit dictionaries for a given planet
-                epoch = transit_times[i]
-                dict_name = f'transit{epoch}_dict'
-                locals()[dict_name] = {}
+            #for i in range(ntransits):                                #iterate through each transit to create transit dictionaries for a given planet
+            #    epoch = transit_times[i]
+            #    dict_name = f'transit{epoch}_dict'
+            locals()[dict_name] = {}
 
-                condition = (exofop_data_m['name']=='t0') * (exofop_data_m['epoch'] != epoch)
-                exofop_data_i = exofop_data_m.drop(exofop_data_m[condition].index)     #drop all rows with transit times not pertaining to the one you want to look at
+                #condition = (exofop_data_m['name']=='t0') * (exofop_data_m['epoch'] != epoch)
+                #exofop_data_i = exofop_data_m.drop(exofop_data_m[condition].index)     #drop all rows with transit times not pertaining to the one you want to look at
 
-                for index, row in exofop_data_i.iterrows():                       #assign variables to proper keys in individual planet or star dictionary
-                    v = convert_to_variable(row)
-                    locals()[dict_name][row['name']] = v                          #example: planet1_dict['p'] = p variable with all associated attributes (name, error, etc)
-                locals()[list_name].append(locals()[dict_name])
+            for index, row in exofop_data_i.iterrows():                       #assign variables to proper keys in individual planet or star dictionary
+                v = convert_to_variable(row)
+                locals()[dict_name][row['name']] = v                          #example: planet1_dict['p'] = p variable with all associated attributes (name, error, etc)
 
-            system_list.append(eval(list_name))
+            system_list.append(eval(dict_name))
 
     #uncertainty floors on stellar parameters
     if system_list[0]['teff'].err < 100:
@@ -591,48 +566,37 @@ def read_fit_param_csv(input_csv):
     true_values = []
 
     for i in range(len(system_list)):                           #for each member of the system...
-        if i == 0:                                              #add only one copy of the stellar parameters to be fit
-            for key in (system_list[i]):
-                if system_list[i][key].flag == 'free':
+        for key in (system_list[i]):                            #and each parameter of that planet...
+            if system_list[i][key].flag == 'free':              #decide if it's free (based on flag), and if so, add the NAME of the parameter to a list
+                if i == 0:                                      #don't change the name of stellar parameters because they're shared
                     freeparams.add(system_list[i][key])
                     true_values.append(system_list[i][key])
-                
-                elif system_list[i][key].flag == 'fixed':
-                    fixed_params.add(system_list[i][key])
-        else:
-            for key in (system_list[i][0]):                        #and each parameter of that planet...
-                if system_list[i][0][key].flag == 'free':              #decide if it's free (based on flag), and if so, add the NAME of the parameter to a list
-                    
-                    temp = deepcopy(system_list[i][0][key])        #creates temporary variable (keeps same properties as original) that will be added to free parameter list
-                    if key == 't0':
-                        epoch = system_list[i][0][key].epoch
-                        temp.name = f'{key}{i}_{epoch}'             #naming scheme = t01_1, t01_3 for transits 1 and 3 of planet 1
-                    else:
-                        temp.name = f'{key}{i}'
+                else:
+                    temp = deepcopy(system_list[i][key])        #creates temporary variable (keeps same properties as original) that will be added to free parameter list
+                    temp.name = f'{key}{i}'
                     freeparams.add(temp)
                     true_values.append(temp)                    #adds true value to separate "truth" list to be used in corner plot before it's overwritten
-           
-                elif system_list[i][0][key].flag == 'fixed':
-                    temp = deepcopy(system_list[i][0][key])        #same creation of temporary variable
-                    if key == 't0':
-                        epoch = system_list[i][0][key].epoch
-                        temp.name = f'{key}{i}_{epoch}'
-                    else:
-                        temp.name = f'{key}{i}'
-                        fixed_params.add(temp)                  #add fixed parameter name to separate list
-            
-            for transit in range(1,len(system_list[i])):         #iterate through each transit to add specific t0 -> t0 for each transit will be treated as its own free parameter
-                epoch = system_list[i][transit]['t0'].epoch
                 
-                temp = deepcopy(system_list[i][transit]['t0'])
-                temp.name = f't0{i}_{epoch}'
-                
-                if system_list[i][transit]['t0'].flag == 'free':
-                    freeparams.add(temp)
-                    true_values.append(temp)
+            elif system_list[i][key].flag == 'fixed':
+                if i == 0:
+                    fixed_params.add(system_list[i][key])
+                else:
+                    temp = deepcopy(system_list[i][key])        #same creation of temporary variable
+                    temp.name = f'{key}{i}'
+                    fixed_params.add(temp)  
 
-                elif system_list[i][transit]['t0'].flag == 'free':
-                    fixed_params.add(temp)
+            #for transit in range(1,len(system_list[i])):         #iterate through each transit to add specific t0 -> t0 for each transit will be treated as its own free parameter
+            #    epoch = system_list[i][transit]['t0'].epoch
+                
+            #    temp = deepcopy(system_list[i][transit]['t0'])
+            #    temp.name = f't0{i}_{epoch}'
+                
+            #    if system_list[i][transit]['t0'].flag == 'free':
+            #        freeparams.add(temp)
+            #        true_values.append(temp)
+
+            #    elif system_list[i][transit]['t0'].flag == 'free':
+            #        fixed_params.add(temp)
                 
             
     return system_list, freeparams, fixed_params, true_values
