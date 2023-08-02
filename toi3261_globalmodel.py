@@ -5,7 +5,7 @@ import pandas as pd
 import os
 import corner
 import emcee
-#from IPython.display import display, Math
+
 from copy import deepcopy
 from isochrones.mist.bc import MISTBolometricCorrectionGrid
 from isochrones import get_ichrone
@@ -17,7 +17,15 @@ import radvel.likelihood
 from astroquery.mast import Catalogs
 import sys
 
- 
+################################################################
+
+# This is a global model to fit the RV, SED, and light curve   #
+# data for TOI-3261. It will save the chains, which can then   #
+# be plotted using another script.                             #
+# This fit assumes no TTVs.                                    #
+
+################################################################
+
 #turn off automatic parallelization to avoid problems with later parallelization method
 os.environ["OMP_NUM_THREADS"] = "1"
 
@@ -25,15 +33,13 @@ os.environ["OMP_NUM_THREADS"] = "1"
 ##### initializing paths to required files #####
 ################################################
 
-filepath = '/home/u1153471/toi3261_scripts/'
-out_folder = '/home/u8015661/emma/toi3261_fitresults/'
-#filepath = '/home/u8015661/emma/koi134_scripts/toi5143/'
+filepath = '/home/u1153471/toi3261_scripts/'             #folder containing initialization files
+out_folder = '/home/u8015661/emma/toi3261_fitresults/'   #folder to store fit results
 
 priorcsv = str(sys.argv[1])           #name of prior csv
 
- #loading in data from csv file
-data = pd.read_csv(filepath+'toi5143_lc',comment='#', header=0) #reading in light curve file
-#ntransit_vs_center = pd.read_csv(filepath+'transittimes_TOI5143.csv', comment='#',header=0)  #csv of approximate transit times and durations
+#loading in data from csv file
+data = pd.read_csv(filepath+'toi3261_detrended_lc',comment='#', header=0) #reading in light curve file
 
 obj_id = "TIC 358070912"
 
@@ -371,6 +377,14 @@ def rv_likelihood(theta, rv_t, rv, rv_e):
 
 ###### Log Likelihood ######
 
+"""
+This function generates a likelihood for each step of the MCMC.
+It stores and updates the values of theta in the correct planet/star 
+dictionary, as these dictionaries are called in the various modeling 
+functions. It returns the combined likelihoods from light curve, SED,
+and RV modeling.
+"""
+
 def log_likelihood(theta, freeparams, fixedparams, system_list):
     
     free_param_list = freeparams.unpack                             #creates set of parameter variable names for each planet
@@ -387,54 +401,34 @@ def log_likelihood(theta, freeparams, fixedparams, system_list):
                 continue
             elif int(freeparams.unpack()[m][-1]) == (i+1):                               #if the subscript (ex. p1, p2) matches the current planet we're looking at
                 system_list[i+1][freeparams.unpack()[m][:-1]].value = theta[m]           #evaluate variable and store it in its respective planet dictionary
-
+    
+    #updating stellar dictionary from new theta
     for i in range(len(theta)):
         if (int(freeparams[i].objno) == 0) :  #if these are stellar parameters, update star dictionary
             system_list[0][freeparams[i].name].value = theta[i]
         else:
             pass
 
-    
 
     #### fitting t0's using residual - perform operations for each transit separately  ####
     planet_likelihood_value = 0
-    #mask_counter = 0
     model = np.zeros(len(t))
 
+    #making batman model for generic multiplanet system
     for i in range(len(system_list)-1):
-        #ntransit_number = len(system_list[i+1])  #number of sub-dictionaries in the planet dictionary = # transits
-
-        #for m in range(ntransit_number):    #generate likelihood of each transit separately
-    
-        #    theta_p = [1,0.01,0.01,0.01] #initial guesses for polynomial coefficients [c0, c1, c2, c3]
-            
-        #    t_mask = time_mask[mask_counter]
-        #    restricted_flux = y[t_mask]
-
-        #    model = batman_model(system_list[i+1][m],system_list[0],t[t_mask])
-
-        #    residual = restricted_flux - model
-            
-        #    detrend_lsq = scipy.optimize.leastsq(least_sq, theta_p, args=(t_mask,residual,yerr[t_mask]))
-            
-        #    c0_new = detrend_lsq[0][0]
-        #    c1_new = detrend_lsq[0][1]
-        #    c2_new = detrend_lsq[0][2]
-        #    c3_new = detrend_lsq[0][3]
-            
-        #    poly_model = polynomial(normalize(t[t_mask]),c0_new,c1_new,c2_new,c3_new)
-        
         model_i = batman_model(system_list[i+1],system_list[0],t) - 1
         model += model_i    
     model += 1
+
+    #calculating likelihood
     likelihood = np.sum((y - model)**2/yerr**2)
     planet_likelihood_value += (-0.5*likelihood)
-        #    mask_counter+=1
     
-            #if batman returns nans, have the log likelihood be -inf
+    #if batman returns nans, have the log likelihood instead be -inf
     if (np.isnan(model).all() == True) or (np.sum(np.abs(model-1))<len(model)*1e-5):
         return -np.inf
 
+    #combine with sed and rv likelihoods
     sed_likelihood_value = sed_likelihood(system_list[0])
     #rv_likelihood_value = rv_likelihood(system_list[1])
         
@@ -496,13 +490,28 @@ def bin_data(x,data, bins, xmin, xmax):
         
     return binned_data, centers
 
-#### Converting to Variable ####
+##### Converting to Variable #####
+
 def convert_to_variable(input_row):
     var_prior = PriorFunction(input_row['prior'], center_value=input_row['value'], error = input_row['error'], upper_bound= input_row['upper_bound'], lower_bound=input_row['lower_bound'],spread=input_row['spread'])
     var_dict  = Variable(input_row['name'],input_row['objectno'],input_row['value'],input_row['error'], prior = var_prior, flag = input_row['flag'])
 
     return var_dict
 
+##### Reading input csv #####
+
+"""
+This function will read the config csv, which has all the info about
+each free parameter and the priors on them. It will sort the input params
+into free vs fixed param lists, and return:
+
+1. 'System List': contains dictionaries of variables belonging to each
+member of the system. (star dictionary, planet 1 dictionary, etc.)
+2. 'Free params': list containing the names of all free parameters
+3. 'Fixed params': list containing names of all fixed parameters
+4. 'True values': list of the initial values of each variable, for corner plotting
+
+"""
 def read_fit_param_csv(input_csv):
     exofop_data = pd.read_csv(input_csv, comment='#',header=0)  #prior data
     nplanet = exofop_data['objectno'].max()
@@ -600,6 +609,8 @@ def read_fit_param_csv(input_csv):
                 
             
     return system_list, freeparams, fixed_params, true_values
+
+##### Functions used for detrending #####
 
 def polynomial(t,c0,c1,c2,c3):
     return c3*t**3 + c2*t**2 + c1*t + c0
