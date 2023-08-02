@@ -646,7 +646,7 @@ if __name__ == '__main__':
 
     print(log_probability(theta_test,freeparams,fixed_params,system_list))
     exit()
-    
+
     output = 'ascii'
     
 
