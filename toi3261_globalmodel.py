@@ -33,10 +33,10 @@ os.environ["OMP_NUM_THREADS"] = "1"
 ##### initializing paths to required files #####
 ################################################
 
-filepath = '/home/u1153471/toi3261_scripts/'             #folder containing initialization files
-out_folder = '/home/u8015661/emma/toi3261_fitresults/'   #folder to store fit results
+filepath = '/home/u1153471/toi3261/scripts/'             #folder containing initialization files
+out_folder = '/home/u8015661/emma/toi3261/fitresults/'   #folder to store fit results
 
-priorcsv = str(sys.argv[1])           #name of prior csv
+priorcsv = 'toi3261_prior.csv'         #name of prior csv
 
 #loading in data from csv file
 data = pd.read_csv(filepath+'toi3261_detrended_lc',comment='#', header=0) #reading in light curve file
@@ -325,13 +325,13 @@ def sed_likelihood(params):
 #read in rv data
 jd_ESPRESSO, rv_ESPRESSO, erv_ESPRESSO = np.loadtxt('WASP-47_ESPRESSO.vels', unpack=True, usecols=(0,1,2))
 
-def initialize_model(planet_dict):
+def initialize_model(planet_dict,star_dict):
     #initial positions based on current theta; note e = 0 bc of usp
     p = planet_dict['p'].value
     t0 = planet_dict['t0'].value
     w =  planet_dict['w'].value
     k = planet_dict['k'].value   #guess here
-    jitter = planet_dict['jitter'].value
+    jitter = star_dict['jitter'].value
     gamma = (rv_ESPRESSO.max()+rv_ESPRESSO.min())/2 #offset that you need to subtract off to compare models
 
     nplanets = len(system_list)-1
@@ -367,9 +367,9 @@ def initialize_model(planet_dict):
     
     return mod
 
-def rv_likelihood(theta, rv_t, rv, rv_e):
+def rv_likelihood(planet_dict,star_dict, rv_t, rv, rv_e):
 
-    rv_model = initialize_model(theta)
+    rv_model = initialize_model(planet_dict, star_dict)
     rv_model_points = rv_model(rv_t) - rv_model.params['gamma_ESPRESSO'].value
     erv2 = rv_e**2 #rv errors here
     return -0.5 * np.sum((rv - rv_model_points) ** 2 / erv2 + np.log(erv2))
@@ -430,8 +430,8 @@ def log_likelihood(theta, freeparams, fixedparams, system_list):
 
     #combine with sed and rv likelihoods
     sed_likelihood_value = sed_likelihood(system_list[0])
-    #rv_likelihood_value = rv_likelihood(system_list[1])
-        
+    #rv_likelihood_value = rv_likelihood(system_list[1],system_list[0], jd_ESPRESSO, rv_ESPRESSO, erv_ESPRESSO)
+    #print(rv_likelihood_value)    
         
     return planet_likelihood_value + sed_likelihood_value #+ rv_likelihood_value
 
@@ -644,7 +644,8 @@ if __name__ == '__main__':
 
     #log_prob = log_probability(theta_test, freeparams, fixed_params)
 
-    #print(log_probability(theta_test,freeparams,fixed_params,system_list))
+    print(log_probability(theta_test,freeparams,fixed_params,system_list))
+    exit()
     
     output = 'ascii'
     

@@ -454,13 +454,13 @@ def log_likelihood(theta, freeparams, fixedparams, system_list):
                 return -np.inf
 
     sed_likelihood_value = sed_likelihood(system_list[0])
-    rv_likelihood_value = rv_likelihood(system_list[0])
+    #rv_likelihood_value = rv_likelihood(system_list[1])
 
     #sigma2 = yerr**2
     #return -0.5 * np.sum((y - model) ** 2 / sigma2 + np.log(sigma2)) + sed_likelihood_value
         
         
-    return planet_likelihood_value + sed_likelihood_value + rv_likelihood_value
+    return planet_likelihood_value + sed_likelihood_value #+ rv_likelihood_value
 
 
 ####### Log Prior #######
