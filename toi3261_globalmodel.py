@@ -43,43 +43,10 @@ data = pd.read_csv(filepath+'toi3261_detrended_lc',comment='#', header=0) #readi
 
 obj_id = "TIC 358070912"
 
-t = np.array(data["time"])
+t = np.array(data["time"]) + 2457000
 y = np.array(data["flux"])
 yerr = np.array(data["err"]) #error
 
-#ntransit = np.array(ntransit_vs_center['epoch'])
-#duration = np.array(ntransit_vs_center['duration'])
-#kepler_time_arr = ntransit_vs_center['time']
-#tess_time_arr = kepler_time_arr + 2454833 - 2457000
-#tess_time_arr = ntransit_vs_center['time']
-#time_error = ntransit_vs_center['err']
-
-#ntransit_vs_center['tess_time'] = tess_time_arr
-#center = ntransit_vs_center['tess_time']
-
-#objectno = np.array(ntransit_vs_center['objectno'])
-#namearr = np.array(['t0']*len(center))
-#priorarr = np.array(['box']*len(center))
-#flagarr = np.array(['free']*len(center))
-#spread_arr = np.array([.0002]*len(center))
-
-#t0_df = pd.DataFrame.from_dict({'name':namearr,'objectno':objectno,'epoch':ntransit,'value':center,'error':time_error*10,'lower_bound':(center-(time_error*10)),'upper_bound':(center+(time_error*10)),'prior': priorarr,'spread': spread_arr,'flag':flagarr})
-
-#time_mask = []
-
-#for j in range(np.max(objectno)):
-#    ntransit_j = np.array(t0_df[t0_df['objectno']==(j+1)]['epoch'])
-#    center_j = np.array(t0_df[t0_df['objectno']==(j+1)]['value'])
-#    duration_j = duration[t0_df['objectno']==(j+1)]
-
-#    fit = np.polyfit(ntransit_j, center_j, 1)  #linear fit just to get prediction of p and t0 for masking purposes
-#    period = fit[0]
-#    t0_original = fit[1]
-
-#    for i in range(len(ntransit_j)):
-#        t0_i = t0_original + period*ntransit_j[i]
-#        time_mask_i = (t>(t0_i-6*duration_j[i])) & (t < (t0_i+6*duration_j[i]))  #creates time masks to cut out each individual transit
-#        time_mask.append(time_mask_i)
         
 ####################################
 ######### Defining Classes #########
@@ -325,14 +292,12 @@ def sed_likelihood(params):
 #read in rv data
 jd_ESPRESSO, rv_ESPRESSO, erv_ESPRESSO = np.loadtxt('WASP-47_ESPRESSO.vels', unpack=True, usecols=(0,1,2))
 
-def initialize_model(planet_dict,star_dict):
+def initialize_model(planet_dict):
     #initial positions based on current theta; note e = 0 bc of usp
     p = planet_dict['p'].value
     t0 = planet_dict['t0'].value
     w =  planet_dict['w'].value
     k = planet_dict['k'].value   #guess here
-    jitter = star_dict['jitter'].value
-    gamma = (rv_ESPRESSO.max()+rv_ESPRESSO.min())/2 #offset that you need to subtract off to compare models
 
     nplanets = len(system_list)-1
     planet_letters = {1:'b'}
@@ -354,10 +319,7 @@ def initialize_model(planet_dict,star_dict):
     anybasis_params['curv'] = radvel.Parameter(value=0.0)            #RV curvature: (If rv is m/s and time is days then [curv] is m/s/day^2)
 
     #Add an offset term for each of your data sets, these start as 0 and will 
-    #be fit to align the data sets with one another
-    anybasis_params['gamma_ESPRESSO'] = radvel.Parameter(value=gamma)      
-
-    anybasis_params['jit_ESPRESSO'] = radvel.Parameter(value=jitter)
+    #be fit to align the data sets with one another     
 
     # Convert input orbital parameters into the fitting basis
     fitting_basis = 'per tc secosw sesinw k' #There are other options specified in the RadVel paper, but this one is pretty common
@@ -369,9 +331,9 @@ def initialize_model(planet_dict,star_dict):
 
 def rv_likelihood(planet_dict,star_dict, rv_t, rv, rv_e):
 
-    rv_model = initialize_model(planet_dict, star_dict)
-    rv_model_points = rv_model(rv_t) - rv_model.params['gamma_ESPRESSO'].value
-    erv2 = rv_e**2 #rv errors here
+    rv_model = initialize_model(planet_dict)
+    rv_model_points = rv_model(rv_t) - star_dict['gamma'].value
+    erv2 = rv_e**2 + star_dict['jitter'].value**2 #rv errors here + jitter in quadrature
     return -0.5 * np.sum((rv - rv_model_points) ** 2 / erv2 + np.log(erv2))
 
 
