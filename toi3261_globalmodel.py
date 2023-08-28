@@ -29,23 +29,24 @@ import sys
 #turn off automatic parallelization to avoid problems with later parallelization method
 os.environ["OMP_NUM_THREADS"] = "1"
 
-################################################
-##### initializing paths to required files #####
-################################################
+##########################################################
+#          Initializing name and required files          #
+#   This will need to be changed on a per-target basis   #
+##########################################################
 
-filepath = '/home/u1153471/toi3261/scripts/'             #folder containing initialization files
+obj_id = "TIC 358070912"
+
+filepath = '/home/u8015661/emma/toi3261/scripts/'             #folder containing initialization files
 out_folder = '/home/u8015661/emma/toi3261/fitresults/'   #folder to store fit results
 
 priorcsv = 'toi3261_prior.csv'         #name of prior csv
 
 #loading in data from csv file
-data = pd.read_csv(filepath+'toi3261_detrended_lc',comment='#', header=0) #reading in light curve file
+data = pd.read_csv(filepath+'toi3261_lc.csv',comment='#', header=0) #reading in light curve file
 
-obj_id = "TIC 358070912"
-
-t = np.array(data["time"]) + 2457000
-y = np.array(data["flux"])
-yerr = np.array(data["err"]) #error
+t = np.array(data["Time (BTJD)"]) + 2457000  #make sure same time units as rv data
+y = np.array(data["PDCSAP_FLUX"])             #detrended flux
+yerr = np.array(data["KSPSAP_FLUX_ERR"])      #error
 
         
 ####################################
@@ -213,9 +214,9 @@ def batman_model(input_dict, star_dict, time):
     aors = aAU*215/star_dict['rstar'].value                  #a over r_star
     inc = 180/np.pi*np.arccos(input_dict['b'].value/aors)
  
-    sqrte_cosw = input_dict['sqrte_cosw'].value
-    sqrte_sinw = input_dict['sqrte_sinw'].value
-    ecc = sqrte_cosw**2 +sqrte_sinw**2
+    secosw = input_dict['secosw'].value
+    sesinw = input_dict['sesinw'].value
+    ecc = secosw**2 +sesinw**2
     
     
     u1 = 2*np.sqrt(star_dict['q1'].value)*star_dict['q2'].value
@@ -227,7 +228,7 @@ def batman_model(input_dict, star_dict, time):
         flux[:] = np.nan
         return flux
     else:
-        w_rad = np.arctan2(sqrte_sinw,sqrte_cosw)
+        w_rad = np.arctan2(sesinw,secosw)
         w = w_rad * 180 / np.pi
 
         params = batman.TransitParams()
@@ -290,51 +291,52 @@ def sed_likelihood(params):
 #### RadVel Fitting ####
 
 #read in rv data
-jd_ESPRESSO, rv_ESPRESSO, erv_ESPRESSO = np.loadtxt('WASP-47_ESPRESSO.vels', unpack=True, usecols=(0,1,2))
+#jd_ESPRESSO, rv_ESPRESSO, erv_ESPRESSO = np.loadtxt('WASP-47_ESPRESSO.vels', unpack=True, usecols=(0,1,2))
 
-def initialize_model(planet_dict):
-    #initial positions based on current theta; note e = 0 bc of usp
-    p = planet_dict['p'].value
-    t0 = planet_dict['t0'].value
-    w =  planet_dict['w'].value
-    k = planet_dict['k'].value   #guess here
+# def initialize_model(planet_dict):
+#     #initial positions based on current theta; note e = 0 bc of usp
+#     p = planet_dict['p'].value
+#     t0 = planet_dict['t0'].value
+#     w = np.arctan2(planet_dict['sesinw'].value,planet_dict['secosw'].value)
+#     e = planet_dict['sesinw'].value**2 + planet_dict['secosw'].value**2
+#     k = planet_dict['k'].value   #guess here
 
-    nplanets = len(system_list)-1
-    planet_letters = {1:'b'}
-    #stellar = dict(mstar=system_list[0]['mstar'].value, mstar_err=system_list[0]['mstar'].err)
+#     nplanets = len(system_list)-1
+#     planet_letters = {1:'b'}
+#     #stellar = dict(mstar=system_list[0]['mstar'].value, mstar_err=system_list[0]['mstar'].err)
 
-    #Set a time base that's located in the middle of your RV time series
-    time_base = 0.5*(jd_ESPRESSO.min() + jd_ESPRESSO.max())
+#     #Set a time base that's located in the middle of your RV time series
+#     time_base = 0.5*(jd_ESPRESSO.min() + jd_ESPRESSO.max())
 
-    #Add starting values for the orbital parameters, taken either from the literature
-    #or from your transit fit -- these don't constrain the fit, they just give it somewhere
-    #to start from
-    anybasis_params = radvel.Parameters(nplanets,basis='per tc e w k', planet_letters=planet_letters)
-    anybasis_params['per1'] = radvel.Parameter(value=p)              #Orbital period
-    anybasis_params['tc1'] = radvel.Parameter(value=t0)              #Time of conjunction
-    anybasis_params['e1'] = radvel.Parameter(value=0.0)              #orbital eccentricity
-    anybasis_params['w1'] = radvel.Parameter(value=w)                #longitude of periastron -- this is rarely well constrained, so just start with pi/2
-    anybasis_params['k1'] = radvel.Parameter(value=k)                #RV semi-amplitude in m/s
-    anybasis_params['dvdt'] = radvel.Parameter(value=0.0)            #RV slope: (If rv is m/s and time is days then [dvdt] is m/s/day)
-    anybasis_params['curv'] = radvel.Parameter(value=0.0)            #RV curvature: (If rv is m/s and time is days then [curv] is m/s/day^2)
+#     #Add starting values for the orbital parameters, taken either from the literature
+#     #or from your transit fit -- these don't constrain the fit, they just give it somewhere
+#     #to start from
+#     anybasis_params = radvel.Parameters(nplanets,basis='per tc e w k', planet_letters=planet_letters)
+#     anybasis_params['per1'] = radvel.Parameter(value=p)              #Orbital period
+#     anybasis_params['tc1'] = radvel.Parameter(value=t0)              #Time of conjunction
+#     anybasis_params['e1'] = radvel.Parameter(value=e)                #orbital eccentricity
+#     anybasis_params['w1'] = radvel.Parameter(value=w)                #longitude of periastron -- this is rarely well constrained, so just start with pi/2
+#     anybasis_params['k1'] = radvel.Parameter(value=k)                #RV semi-amplitude in m/s
+#     anybasis_params['dvdt'] = radvel.Parameter(value=0.0)            #RV slope: (If rv is m/s and time is days then [dvdt] is m/s/day)
+#     anybasis_params['curv'] = radvel.Parameter(value=0.0)            #RV curvature: (If rv is m/s and time is days then [curv] is m/s/day^2)
 
-    #Add an offset term for each of your data sets, these start as 0 and will 
-    #be fit to align the data sets with one another     
+#     #Add an offset term for each of your data sets, these start as 0 and will 
+#     #be fit to align the data sets with one another     
 
-    # Convert input orbital parameters into the fitting basis
-    fitting_basis = 'per tc secosw sesinw k' #There are other options specified in the RadVel paper, but this one is pretty common
-    params = anybasis_params.basis.to_any_basis(anybasis_params,fitting_basis)
+#     # Convert input orbital parameters into the fitting basis
+#     fitting_basis = 'per tc secosw sesinw k' #There are other options specified in the RadVel paper, but this one is pretty common
+#     params = anybasis_params.basis.to_any_basis(anybasis_params,fitting_basis)
 
-    mod = radvel.RVModel(params, time_base=time_base)
+#     mod = radvel.RVModel(params, time_base=time_base)
     
-    return mod
+#     return mod
 
-def rv_likelihood(planet_dict,star_dict, rv_t, rv, rv_e):
+# def rv_likelihood(planet_dict,star_dict, rv_t, rv, rv_e):
 
-    rv_model = initialize_model(planet_dict)
-    rv_model_points = rv_model(rv_t) - star_dict['gamma'].value
-    erv2 = rv_e**2 + star_dict['jitter'].value**2 #rv errors here + jitter in quadrature
-    return -0.5 * np.sum((rv - rv_model_points) ** 2 / erv2 + np.log(erv2))
+#     rv_model = initialize_model(planet_dict)
+#     rv_model_points = rv_model(rv_t) - star_dict['gamma'].value
+#     erv2 = rv_e**2 + star_dict['jitter'].value**2 #rv errors here + jitter in quadrature
+#     return -0.5 * np.sum((rv - rv_model_points) ** 2 / erv2 + np.log(erv2))
 
 
 ###### Log Likelihood ######
@@ -381,6 +383,15 @@ def log_likelihood(theta, freeparams, fixedparams, system_list):
         model_i = batman_model(system_list[i+1],system_list[0],t) - 1
         model += model_i    
     model += 1
+
+    #phase = phasefold(t,system_list[1]['t0'].value,system_list[1]['p'].value)
+    #phase[phase<=.5]+=1
+    #print(system_list[1]['t0'].value)
+    #fig = plt.figure()
+    #plt.scatter(phase,model,c='red',zorder=100)
+    #plt.scatter(phase,y,c='blue',zorder=10)
+    
+    #fig.savefig(out_folder+'initial_conditions.png')
 
     #calculating likelihood
     likelihood = np.sum((y - model)**2/yerr**2)
@@ -604,10 +615,13 @@ if __name__ == '__main__':
     theta_test, nwalkers, ndim, pos2 = freeparams.initialize_theta()
     pos = np.swapaxes(pos2,0,1)
 
+    print(pos)
+    exit()
+
     #log_prob = log_probability(theta_test, freeparams, fixed_params)
 
-    print(log_probability(theta_test,freeparams,fixed_params,system_list))
-    exit()
+    #print(log_probability(theta_test,freeparams,fixed_params,system_list))
+    #exit()
 
     output = 'ascii'
     
@@ -663,7 +677,7 @@ if __name__ == '__main__':
             header = np.array(header2)
 
             np.savetxt(out_folder+'testparams_step_nottvs', header.reshape(1,header.shape[0]),fmt='%s')
-            os.system('cat '+out_folder+'testparams_step >> '+ out_folder+'mcmc_tested_params_nottvs')
+            os.system('cat '+out_folder+'testparams_step_nottvs >> '+ out_folder+'mcmc_tested_params_nottvs')
 
             master_pos = np.ones([100*nwalkers,ndim+1])
             counter = 0
@@ -681,5 +695,5 @@ if __name__ == '__main__':
                     
                     if counter >= 100 * nwalkers:
                         np.savetxt(out_folder+"testparams_step_nottvs", master_pos, fmt='%.10f')
-                        os.system("cat "+ out_folder +"testparams_step >> " + out_folder + "mcmc_tested_params_nottvs")
+                        os.system("cat "+ out_folder +"testparams_step_nottvs >> " + out_folder + "mcmc_tested_params_nottvs")
                         counter = 0
